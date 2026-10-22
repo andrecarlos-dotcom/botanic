@@ -1,0 +1,312 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Botanic - O Jogo da Bruxa Herbal</title>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #000000; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; font-family: 'MedievalSharp', fantasy; }
+        #game-container { width: 100vw; height: 100vh; overflow: hidden; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+
+    <script>
+        const GAME_WIDTH = 1920;
+        const GAME_HEIGHT = 1080;
+        const CENTER_X = GAME_WIDTH / 2;
+        const CENTER_Y = GAME_HEIGHT / 2;
+        const GAME_FONT = 'MedievalSharp, fantasy';
+        const GOLD = '#ffd86b';
+        const DARK_GOLD = '#d4af37';
+        const BROWN_STROKE = '#5d4037';
+        const DARK_PANEL = 0x1f1114;
+
+        // Dados das Ervas
+        const ERVAS_DATA = [
+            {nome:'cabacinha', imagem:'cabacinha.png', cura:'sinusite', descricao:'Alivia sinusite'},
+            {nome:'erva_doce', imagem:'erva_doce.png', cura:'colica', descricao:'Alivia cÃ³licas'},
+            {nome:'babosa', imagem:'babosa.png', cura:'queloides', descricao:'Trata queloides'},
+            {nome:'gengibre', imagem:'gengibre.png', cura:'tosse', descricao:'Combate tosse'},
+            {nome:'arnica', imagem:'arnica.png', cura:'dor_costas', descricao:'Cura Dor nas Costas'},
+            {nome:'romÃ£', imagem:'roma.png', cura:'dor_garganta', descricao:'Trata dor de garganta'},
+            {nome:'boldo', imagem:'boldo.png', cura:'enjoo', descricao:'Alivia enjoos'},
+            {nome:'cidreira', imagem:'cidreira.png', cura:'insonia', descricao:'Combate insÃ´nia'},
+            {nome:'vinagreira', imagem:'vinagreira.png', cura:'irritacao', descricao:'Trata irritaÃ§Ãµes'}
+        ];
+
+        // Dados dos Problemas/Pacientes
+        const PROBLEMAS_DATA = [
+            {nome:'sinusite', imagem:'sinusite.png', curaNecessaria:'sinusite', descricao:'Paciente com sinusite'},
+            {nome:'colica', imagem:'colica.png', curaNecessaria:'colica', descricao:'Paciente com cÃ³lica'},
+            {nome:'queloides', imagem:'queloides.png', curaNecessaria:'queloides', descricao:'Paciente com queloides'},
+            {nome:'tosse', imagem:'tosse.png', curaNecessaria:'tosse', descricao:'Paciente com tosse'},
+            {nome:'dor_costas', imagem:'dor_costas.png', curaNecessaria:'dor_costas', descricao:'Paciente com Dor nas Costas'},
+            {nome:'dor_garganta', imagem:'dor_garganta.png', curaNecessaria:'dor_garganta', descricao:'Paciente com dor de garganta'},
+            {nome:'enjoo', imagem:'enjoo.png', curaNecessaria:'enjoo', descricao:'Paciente enjoado'},
+            {nome:'insonia', imagem:'insonia.png', curaNecessaria:'insonia', descricao:'Paciente com insÃ´nia'},
+            {nome:'irritacao', imagem:'irritado.png', curaNecessaria:'irritacao', descricao:'Paciente irritado'}
+        ];
+
+        // CENA 1: TELA INICIAL
+        class StartScene extends Phaser.Scene {
+            constructor() { super('tESTE'); }
+            
+            preload() {
+                // Carregamento da imagem da primeira tela
+                this.load.image('tela_inicial', './assets/StartScene.png');
+            }
+            
+            create() {
+                // Fundo reserva
+                this.add.rectangle(CENTER_X, CENTER_Y, GAME_WIDTH, GAME_HEIGHT, 0x000000);
+                
+                // ExibiÃ§Ã£o da imagem da tela inicial
+                const bg = this.add.image(CENTER_X, CENTER_Y, 'tela_inicial').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+                
+                // Texto de interaÃ§Ã£o
+                const btnText = this.add.text(CENTER_X, 930, 'iniciar jogo', { 
+                    fontSize: '64px',
+                    fill: GOLD,
+                    fontFamily: GAME_FONT,
+                    stroke: BROWN_STROKE,
+                    strokeThickness: 5
+                }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+                this.tweens.add({
+                    targets: btnText,
+                    alpha: 0.55,
+                    scale: 1.06,
+                    duration: 850,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                
+                // Comando para iniciar a cena do jogo
+                btnText.on('pointerdown', () => this.scene.start('GameScene'));
+            }
+        }
+
+        // CENA 2: O JOGO
+        class GameScene extends Phaser.Scene {
+            constructor() { super('GameScene'); }
+            
+            init() {
+                this.pontuacao = 0; 
+                this.vidas = 3; 
+                this.tempoRestante = 30; 
+                this.podeJogar = true; 
+                this.cartasNaMao = []; 
+                this.problemaAtual = null;
+            }
+            
+            preload() {
+                const basePath = 'assets/';
+                PROBLEMAS_DATA.forEach(p => this.load.image(p.nome, basePath + p.imagem));
+                ERVAS_DATA.forEach(e => this.load.image(e.nome, basePath + e.imagem));
+                this.load.image('fundo_tela', basePath + 'fundo_tela.png');
+                this.load.image('bruxa', basePath + 'bruxa.png');
+                this.load.image('icone_pontuacao', basePath + 'PONTUACAO.png');
+                this.load.image('icone_vida', basePath + 'VIDA.png');
+                this.load.image('icone_tempo', basePath + 'TEMPO.png');
+            }
+            
+            create() {
+                this.add.image(CENTER_X, CENTER_Y, 'fundo_tela').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+                
+                this.add.rectangle(CENTER_X, CENTER_Y, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.14);
+                this.add.image(1510, 520, 'bruxa').setScale(0.42).setDepth(0);
+                this.criarInterfaceFixa();
+
+                // LÃ³gica de Drag (Arraste)
+                this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
+                    if (!this.podeJogar) return;
+                    gameObject.setDepth(20);
+                    gameObject.x = dragX; 
+                    gameObject.y = dragY;
+                });
+
+                this.input.on('drop', this.handleCardDrop, this);
+                this.proximoProblema();
+                
+                // Timer
+                this.timerEvent = this.time.addEvent({ delay: 1000, callback: this.atualizarTempo, callbackScope: this, loop: true });
+            }
+
+            criarPainel(x, y, largura, altura, cor, alpha, borda = 0xc7923e) {
+                const painel = this.add.graphics();
+                painel.fillStyle(cor, alpha);
+                painel.lineStyle(4, borda, 1);
+                painel.fillRoundedRect(x - largura / 2, y - altura / 2, largura, altura, 14);
+                painel.strokeRoundedRect(x - largura / 2, y - altura / 2, largura, altura, 14);
+                return painel;
+            }
+
+            criarInterfaceFixa() {
+                this.criarPainel(178, 74, 300, 96, DARK_PANEL, 0.9);
+                this.criarPainel(178, 184, 300, 96, DARK_PANEL, 0.9);
+                this.criarPainel(178, 294, 300, 96, DARK_PANEL, 0.9);
+
+                this.estrelaPontuacao = this.add.image(72, 80, 'icone_pontuacao').setDisplaySize(60, 86);
+                this.add.text(122, 42, 'PONTUAÇÃO', { fontSize: '21px', fill: '#ffffff', fontFamily: GAME_FONT, stroke: '#000000', strokeThickness: 2 }).setOrigin(0, 0.5);
+                this.scoreText = this.add.text(122, 80, '0', { fontSize: '44px', fill: GOLD, fontFamily: GAME_FONT, stroke: BROWN_STROKE, strokeThickness: 3 }).setOrigin(0, 0.5);
+
+                this.vidaIcons = [];
+                this.add.image(66, 184, 'icone_vida').setDisplaySize(48, 44);
+                this.add.text(122, 150, 'VIDAS', { fontSize: '21px', fill: '#ffffff', fontFamily: GAME_FONT, stroke: '#000000', strokeThickness: 2 }).setOrigin(0, 0.5);
+                for (let i = 0; i < 3; i++) {
+                    this.vidaIcons.push(this.add.image(124 + i * 58, 192, 'icone_vida').setDisplaySize(46, 42));
+                }
+
+                this.add.image(74, 304, 'icone_tempo').setDisplaySize(34, 66);
+                this.add.text(122, 260, 'TEMPO', { fontSize: '21px', fill: '#ffffff', fontFamily: GAME_FONT, stroke: '#000000', strokeThickness: 2 }).setOrigin(0, 0.5);
+                this.tempoText = this.add.text(122, 304, this.tempoRestante + ' s', { fontSize: '44px', fill: GOLD, fontFamily: GAME_FONT, stroke: BROWN_STROKE, strokeThickness: 3 }).setOrigin(0, 0.5);
+            }
+
+            atualizarVidasHud() {
+                this.vidaIcons.forEach((icone, index) => {
+                    icone.setVisible(index < this.vidas);
+                });
+            }
+
+            animarEstrelaPontuacao() {
+                this.tweens.add({
+                    targets: this.estrelaPontuacao,
+                    scaleX: 1.35,
+                    scaleY: 1.35,
+                    alpha: 0.65,
+                    duration: 130,
+                    ease: 'Sine.easeOut',
+                    yoyo: true,
+                    repeat: 1,
+                    onComplete: () => {
+                        this.estrelaPontuacao.setScale(1);
+                        this.estrelaPontuacao.setAlpha(1);
+                        this.estrelaPontuacao.setDisplaySize(60, 86);
+                    }
+                });
+            }
+
+            proximoProblema() {
+                if (this.pacienteCard) this.pacienteCard.destroy();
+
+                let nomeAnterior = this.problemaAtual ? this.problemaAtual.nome : null;
+                let novo;
+                do {
+                    novo = Phaser.Utils.Array.GetRandom(PROBLEMAS_DATA);
+                } while (novo.nome === nomeAnterior);
+
+                this.problemaAtual = novo;
+                this.gerarMaoComCura(this.problemaAtual.curaNecessaria);
+                
+                this.pacienteCard = this.add.container(CENTER_X - 80, 470);
+                this.pacienteCard.setDepth(4);
+                const titulo = this.add.text(0, -265, 'PACIENTE', { fontSize: '52px', fill: GOLD, fontFamily: GAME_FONT, stroke: BROWN_STROKE, strokeThickness: 5 }).setOrigin(0.5);
+                const paciente = this.add.sprite(0, -45, this.problemaAtual.nome).setScale(0.88);
+                const label = this.add.text(0, 0, '', { fontSize: '36px', fill: GOLD, fontFamily: GAME_FONT, stroke: BROWN_STROKE, strokeThickness: 4 }).setOrigin(0.5);
+                const problema = this.add.text(0, 230, this.problemaAtual.curaNecessaria.toUpperCase(), { fontSize: '58px', fill: GOLD, fontFamily: GAME_FONT, stroke: BROWN_STROKE, strokeThickness: 5 }).setOrigin(0.5);
+                this.pacienteCard.add([titulo, paciente, label, problema]);
+
+                if (!this.dropZone) this.dropZone = this.add.zone(CENTER_X - 80, 470, 420, 560).setRectangleDropZone(420, 560);
+                this.podeJogar = true;
+            }
+
+            gerarMaoComCura(curaObrigatoria) {
+                this.cartasNaMao.forEach(c => {
+                    if (c.card) c.card.destroy();
+                });
+                this.cartasNaMao = [];
+
+                const ervaCerta = ERVAS_DATA.find(e => e.cura === curaObrigatoria);
+                const outras = Phaser.Utils.Array.Shuffle(ERVAS_DATA.filter(e => e.cura !== curaObrigatoria)).slice(0, 4);
+                const maoTotal = Phaser.Utils.Array.Shuffle([ervaCerta, ...outras]);
+
+                maoTotal.forEach((erva, index) => {
+                    const x = 500 + index * 245, y = 880;
+                    const card = this.add.container(x, y);
+                    const sprite = this.add.sprite(0, 0, erva.nome).setScale(0.56);
+
+                    card.add([sprite]);
+                    card.setSize(190, 270);
+                    card.setInteractive({ useHandCursor: true });
+                    card.setDepth(5);
+                    this.input.setDraggable(card);
+                    card.setData({ erva });
+                    this.cartasNaMao.push({ card });
+                });
+            }
+
+            handleCardDrop(pointer, cardSprite, dropZone) {
+                if (!this.podeJogar) return;
+                const erva = cardSprite.getData('erva');
+
+                if (erva.cura === this.problemaAtual.curaNecessaria) {
+                    this.pontuacao += 10;
+                    this.scoreText.setText(String(this.pontuacao));
+                    this.animarEstrelaPontuacao();
+                    this.podeJogar = false;
+                    this.time.delayedCall(500, () => this.proximoProblema());
+                } else {
+                    this.vidas--;
+                    this.atualizarVidasHud();
+                    if (this.vidas <= 0) {
+                        this.finalizarJogo(false);
+                    } else {
+                        cardSprite.x = cardSprite.input.dragStartX;
+                        cardSprite.y = cardSprite.input.dragStartY;
+                        cardSprite.setDepth(5);
+                    }
+                }
+            }
+
+            atualizarTempo() {
+                if (!this.podeJogar) return;
+                if (this.tempoRestante > 0) {
+                    this.tempoRestante--;
+                    this.tempoText.setText(this.tempoRestante + ' s');
+                } else {
+                    this.finalizarJogo(this.pontuacao >= 50);
+                }
+            }
+
+            finalizarJogo(vitoria) {
+                this.podeJogar = false;
+                const mensagem = vitoria ? 'VITÓRIA!' : 'PERDEMOS!';
+                const finalTxt = this.add.text(CENTER_X, CENTER_Y, mensagem, { 
+                    fontSize: '118px', fill: GOLD, stroke: BROWN_STROKE, strokeThickness: 10, fontFamily: GAME_FONT
+                }).setOrigin(0.5).setDepth(10);
+
+                this.time.delayedCall(3000, () => {
+                    finalTxt.destroy();
+                    this.pontuacao = 0; this.vidas = 3; this.tempoRestante = 30;
+                    this.scoreText.setText('0');
+                    this.atualizarVidasHud();
+                    this.tempoText.setText('30 s');
+                    this.proximoProblema();
+                });
+            }
+        }
+
+        // ConfiguraÃ§Ã£o Global do Phaser
+        const config = { 
+            type: Phaser.AUTO, 
+            width: GAME_WIDTH, 
+            height: GAME_HEIGHT, 
+            parent: 'game-container', 
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            scene: [StartScene, GameScene] 
+        };
+        
+        new Phaser.Game(config);
+    </script>
+</body>
+</html>
+

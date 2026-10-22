@@ -1,0 +1,77 @@
+import arcade
+import random
+
+# velocidade máxima e raio máximo da bola
+V_X_BOLA = 5
+V_Y_BOLA = 5
+MAX_RAIO_BOLA = 30
+
+# tamanho e título da janela
+LARG_TELA = 400
+ALT_TELA = 300
+TIT_TELA = "Bolinha"
+
+
+class Bola:
+    def _init_(self):
+        # raio
+        self.raio = random.randint(10, MAX_RAIO_BOLA)
+
+        # coordenada inicial respeitando o raio
+        self.x = random.randint(self.raio, LARG_TELA - self.raio)
+        self.y = random.randint(self.raio, ALT_TELA - self.raio)
+
+        # velocidade
+        self.v_x = random.randint(1, V_X_BOLA)
+        self.v_y = random.randint(1, V_Y_BOLA)
+
+        # cor
+        self.cor = (
+            random.randint(0, 255),
+            random.randint(0, 255),
+            random.randint(0, 255)
+        )
+
+    def move(self):
+        self.x += self.v_x
+        self.y += self.v_y
+
+        # colisão com bordas
+        if self.x - self.raio < 0 or self.x + self.raio > LARG_TELA:
+            self.v_x *= -1
+        if self.y - self.raio < 0 or self.y + self.raio > ALT_TELA:
+            self.v_y *= -1
+
+    def desenha(self):
+        arcade.draw_circle_filled(self.x, self.y, self.raio, self.cor)
+
+
+class MeuJogo(arcade.Window):
+    def _init_(self):
+        super()._init_(LARG_TELA, ALT_TELA, TIT_TELA)
+        arcade.set_background_color(arcade.color.WHITE)
+
+        self.bola_list = []
+        self.bola_list.append(Bola())
+
+    def on_update(self, delta_time):
+        for bola in self.bola_list:
+            bola.move()
+
+    def on_draw(self):
+        arcade.start_render()
+        for bola in self.bola_list:
+            bola.desenha()
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.SPACE:
+            self.bola_list.append(Bola())
+
+
+def main():
+    window = MeuJogo()
+    arcade.run()
+
+
+if _name_ == "_main_":
+    main()
